@@ -66,7 +66,9 @@ namespace Zenject.ReflectionBaking
 
             foreach (var typeDef in allTypes)
             {
-                if (_namespaceRegexes.Any() && !_namespaceRegexes.Any(x => x.IsMatch(typeDef.FullName)))
+                // Zenject namespace gets automatically added to the list of namespaces. 
+                // So to check if user added any other namespaces, we need to compare namespace count with 1
+                if (_namespaceRegexes.Count > 1 && !_namespaceRegexes.Any(x => x.IsMatch(typeDef.FullName)))
                 {
                     continue;
                 }
@@ -655,33 +657,41 @@ namespace Zenject.ReflectionBaking
         TypeReference CreateGenericInstanceIfNecessary(
             Type memberType, Collection<GenericParameter> genericParams)
         {
-            if (!memberType.ContainsGenericParameters)
+            try
             {
-                return _module.Import(memberType);
+                if (!memberType.ContainsGenericParameters)
+                {
+                    return _module.Import(memberType);
+                }
+
+                if (memberType.IsGenericParameter)
+                {
+                    return genericParams[memberType.GenericParameterPosition];
+                }
+
+                if (memberType.IsArray)
+                {
+                    return new ArrayType(
+                        CreateGenericInstanceIfNecessary(memberType.GetElementType(), genericParams), memberType.GetArrayRank());
+                }
+
+                var genericMemberType = memberType.GetGenericTypeDefinition();
+
+                var genericInstance = new GenericInstanceType(_module.Import(genericMemberType));
+
+                foreach (var arg in memberType.GenericArguments())
+                {
+                    genericInstance.GenericArguments.Add(
+                        CreateGenericInstanceIfNecessary(arg, genericParams));
+                }
+
+                return genericInstance;
+            }
+            catch (Exception e)
+            {
+                throw Assert.CreateException("Cannot create generic instance, exception '{0}'", e.Message);
             }
 
-            if (memberType.IsGenericParameter)
-            {
-                return genericParams[memberType.GenericParameterPosition];
-            }
-
-            if (memberType.IsArray)
-            {
-                return new ArrayType(
-                    CreateGenericInstanceIfNecessary(memberType.GetElementType(), genericParams), memberType.GetArrayRank());
-            }
-
-            var genericMemberType = memberType.GetGenericTypeDefinition();
-
-            var genericInstance = new GenericInstanceType(_module.Import(genericMemberType));
-
-            foreach (var arg in memberType.GenericArguments())
-            {
-                genericInstance.GenericArguments.Add(
-                    CreateGenericInstanceIfNecessary(arg, genericParams));
-            }
-
-            return genericInstance;
         }
 
         void AddInjectableMemberInstructions(

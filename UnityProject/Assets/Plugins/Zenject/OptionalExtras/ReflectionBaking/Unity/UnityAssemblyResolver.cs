@@ -28,14 +28,13 @@ namespace Zenject.ReflectionBaking
                     continue;
                 }
 #endif
+                //Some how Raider break this. Location of rider editor plugin in empty. Add check for this 
+                if (string.IsNullOrWhiteSpace(assemblies[i].Location))
+                    continue;
 
                 _appDomainAssemblyLocations[assemblies[i].FullName] = assemblies[i].Location;
 
-                var assemblyPath = assemblies[i].Location;
-
-                if (!string.IsNullOrEmpty(assemblyPath)) {
-                  AddSearchDirectory(Path.GetDirectoryName(assemblies[i].Location));
-                }
+                AddSearchDirectory(Path.GetDirectoryName(assemblies[i].Location));
             }
         }
 
